@@ -1,0 +1,54 @@
+{
+  "debugger_address": "127.0.0.1:9222",
+  "prompt": "test codex nhe",
+  "frame_path": [
+    0,
+    0
+  ],
+  "latest": {
+    "key": "019ce13a-b090-7310-9182-f8315ab1917a:1:assistant",
+    "role": "assistant",
+    "text": "Ổn nhé, Codex đang chạy bình thường. Bạn quăng task thật đi, mình làm luôn."
+  },
+  "messages": [
+    {
+      "key": "019ce138-6562-7a40-83fb-32da4b8e0400:0:user",
+      "role": "user",
+      "text": "test codex nhe"
+    },
+    {
+      "key": "019ce138-6562-7a40-83fb-32da4b8e0400:1:assistant",
+      "role": "assistant",
+      "text": "Codex đang chạy tốt. Bạn muốn mình test gì tiếp: đọc/sửa code, chạy script, hay debug lỗi?"
+    },
+    {
+      "key": "019ce138-ad43-75f1-90a4-5acd0c63f97d:0:user",
+      "role": "user",
+      "text": "test codex nhe"
+    },
+    {
+      "key": "019ce138-ad43-75f1-90a4-5acd0c63f97d:1:assistant",
+      "role": "assistant",
+      "text": "Ok, Codex vẫn hoạt động bình thường. Gửi task cụ thể đi, mình xử lý luôn."
+    },
+    {
+      "key": "019ce13a-b090-7310-9182-f8315ab1917a:0:user",
+      "role": "user",
+      "text": "test codex nhe"
+    },
+    {
+      "key": "019ce13a-b090-7310-9182-f8315ab1917a:1:assistant",
+      "role": "assistant",
+      "text": "Ổn nhé, Codex đang chạy bình thường. Bạn quăng task thật đi, mình làm luôn."
+    }
+  ],
+  "meta": {
+    "seen_thinking": true,
+    "thinking_done": true,
+    "post_delay": 1.0,
+    "state": {
+      "active": false,
+      "hits": []
+    }
+  }
+}

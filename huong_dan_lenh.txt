@@ -1,0 +1,65 @@
+HUONG DAN LENH NHANH - AUTO GO PROMPT CODEX
+==========================================
+
+1) Chay mac dinh (go + Enter gui luon):
+python3 so_do/test_ai_auto/main_service.py --message "test codex nhe"
+
+1b) Gui prompt roi nhat ket qua ngay trong 1 lenh:
+python3 so_do/test_ai_auto/send_and_get_result.py --message "test codex nhe"
+
+2) Chi go, KHONG Enter (de kiem tra o chat):
+python3 so_do/test_ai_auto/main_service.py --message "test codex nhe" --no-enter
+
+3) Ghi log debug vao file txt cu the:
+python3 so_do/test_ai_auto/main_service.py \
+  --message "test codex nhe" \
+  --debug-log /Users/dangtin306/Documents/Python/so_do/test_ai_auto/deep_scan_debug.txt
+
+4) Vua no-enter vua ghi log (de debug):
+python3 so_do/test_ai_auto/main_service.py \
+  --message "test codex nhe" \
+  --no-enter \
+  --debug-log /Users/dangtin306/Documents/Python/so_do/test_ai_auto/deep_scan_debug.txt
+
+5) Neu auto tim that bai thi cho 5s de click tay vao o chat:
+python3 so_do/test_ai_auto/main_service.py --message "test codex nhe" --fallback-wait 5
+
+6) Tu mo VS Code/Electron neu chua co debug target:
+python3 so_do/test_ai_auto/main_service.py \
+  --message "test codex nhe" \
+  --auto-launch-chrome
+
+7) Xem tro giup tham so:
+python3 so_do/test_ai_auto/main_service.py --help
+
+8) Nhat cau tra loi moi nhat cua Codex va luu ra file txt/json:
+python3 so_do/test_ai_auto/get_result.py
+
+8b) Neu da gui prompt roi, doi het Thinking + delay 1s roi nhat ket qua:
+python3 so_do/test_ai_auto/wait_for_completion.py
+
+9) Vua nhat ket qua vua in ca lich su message units de debug:
+python3 so_do/test_ai_auto/get_result.py --print-all
+
+Anh debug screenshot se duoc luu tai:
+so_do/test_ai_auto/image_vscode/
+
+
+LENH CHO SCRIPT PYAUTOGUI (auto_codex_vscode.py)
+=================================================
+
+1) Chay va nhap prompt tu ban phim:
+python3 so_do/test_ai_auto/auto_codex_vscode.py
+
+2) Gui 1 prompt, tu focus VS Code, click vao toa do chat:
+python3 so_do/test_ai_auto/auto_codex_vscode.py \
+  --message "test codex nhe" \
+  --activate-vscode \
+  --click-x 1470 --click-y 1035
+
+3) Gui tu file prompt:
+python3 so_do/test_ai_auto/auto_codex_vscode.py \
+  --file so_do/test_ai_auto/prompts.txt \
+  --activate-vscode \
+  --click-x 1470 --click-y 1035 \
+  --wait-between 12
