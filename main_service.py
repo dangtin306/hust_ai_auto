@@ -1091,6 +1091,7 @@ def main() -> int:
     finally:
         if args.keep_open > 0:
             time.sleep(args.keep_open)
+            print("Ket thuc script, dong trinh duyet debug.")
         driver.quit()
 
 
