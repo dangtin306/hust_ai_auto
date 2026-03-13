@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import platform
+import shutil
 import socket
 import subprocess
 import time
@@ -51,12 +52,33 @@ def windows_code_binary_candidates() -> list[str]:
     local_app_data = os.environ.get("LOCALAPPDATA", "")
     program_files = os.environ.get("ProgramFiles", "")
     program_files_x86 = os.environ.get("ProgramFiles(x86)", "")
-    return [
+    explicit_candidates = [
         str(Path(local_app_data) / "Programs" / "Microsoft VS Code" / "Code.exe"),
         str(Path(local_app_data) / "Programs" / "Microsoft VS Code Insiders" / "Code - Insiders.exe"),
         str(Path(program_files) / "Microsoft VS Code" / "Code.exe"),
         str(Path(program_files_x86) / "Microsoft VS Code" / "Code.exe"),
+        str(Path(local_app_data) / "Programs" / "VSCodium" / "VSCodium.exe"),
     ]
+
+    path_candidates: list[str] = []
+    for command in (
+        "code",
+        "code.cmd",
+        "code-insiders",
+        "code-insiders.cmd",
+        "codium",
+        "codium.cmd",
+    ):
+        hit = shutil.which(command)
+        if hit:
+            path_candidates.append(hit)
+
+    ordered = path_candidates + explicit_candidates
+    deduped: list[str] = []
+    for item in ordered:
+        if item and item not in deduped:
+            deduped.append(item)
+    return deduped
 
 
 def _launch_macos(debugger_address: str, startup_wait: float) -> bool:
@@ -94,16 +116,23 @@ def _launch_windows(debugger_address: str, startup_wait: float) -> bool:
     )
     if not code_binary:
         print("Khong tim thay binary VS Code tren Windows de tu mo remote debugging.")
+        print("Hay dam bao lenh 'code' co trong PATH hoac VS Code duoc cai dung thu muc mac dinh.")
         return False
 
     user_data_dir = Path(os.environ.get("TEMP", str(Path.home()))) / "vscode-selenium-profile"
-    cmd = [
-        code_binary,
+    argv = [
         f"--remote-debugging-port={port}",
         f"--user-data-dir={user_data_dir}",
         "--no-first-run",
         "--no-default-browser-check",
     ]
+    binary_path = Path(code_binary)
+    if binary_path.suffix.lower() in {".cmd", ".bat"}:
+        cmd = ["cmd", "/c", code_binary, *argv]
+    else:
+        cmd = [code_binary, *argv]
+
+    print(f"Dung binary VS Code tren Windows: {code_binary}")
     subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     print(f"Da yeu cau mo VS Code debug tren cong {port}, doi {startup_wait:.1f}s...")
     time.sleep(startup_wait)
