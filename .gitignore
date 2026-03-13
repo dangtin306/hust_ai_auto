@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 latest_codex_reply.json
 latest_codex_reply.txt
+.DS_Store

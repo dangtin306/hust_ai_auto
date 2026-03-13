@@ -23,7 +23,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
 from send_image import send_image_to_chat
-from start_service import launch_chrome_debugger
+from start_service import dismiss_vscode_update_notification, has_vscode_update_notification, launch_chrome_debugger
 
 DEEP_SCAN_JS = r"""
 const selectors = arguments[0];
@@ -1011,6 +1011,34 @@ def main() -> int:
     previous_signature = ('', '')
 
     try:
+        time.sleep(3.0)
+        print("Dang kiem tra thong bao VS Code...")
+        popup_meta = has_vscode_update_notification(driver=driver)
+        append_debug_log(log_path, "check_vscode_notification", popup_meta)
+        if popup_meta.get("has_notification"):
+            count = int(popup_meta.get("notification_count") or 0)
+            print(f"Da tim thay thong bao VS Code (count={count}).")
+            time.sleep(1.0)
+            dismiss_meta = dismiss_vscode_update_notification(driver=driver)
+            append_debug_log(log_path, "dismiss_vscode_notification", dismiss_meta)
+            time.sleep(0.35)
+            after_dismiss = has_vscode_update_notification(driver=driver)
+            append_debug_log(log_path, "check_vscode_notification_after_dismiss", after_dismiss)
+            if dismiss_meta.get("clicked") and not after_dismiss.get("has_notification"):
+                print("Da dong thong bao VS Code bang nut X.")
+            else:
+                retry_meta = dismiss_vscode_update_notification(driver=driver)
+                append_debug_log(log_path, "dismiss_vscode_notification_retry", retry_meta)
+                time.sleep(0.35)
+                after_retry = has_vscode_update_notification(driver=driver)
+                append_debug_log(log_path, "check_vscode_notification_after_retry", after_retry)
+                if retry_meta.get("clicked") and not after_retry.get("has_notification"):
+                    print("Da dong thong bao VS Code bang nut X (lan 2).")
+                else:
+                    print("Tim thay thong bao VS Code nhung khong dong duoc bang nut X.")
+        else:
+            print("Khong thay thong bao VS Code can dong.")
+
         if not args.no_wait_reply and not args.no_enter:
             reply_frame_path = find_message_frame_path(driver)
             if reply_frame_path is not None:
@@ -1024,7 +1052,6 @@ def main() -> int:
                     "reply_frame_not_found_before_send",
                     {"debugger_address": args.debugger_address},
                 )
-
         ok = send_message(
             driver=driver,
             message=args.message,
