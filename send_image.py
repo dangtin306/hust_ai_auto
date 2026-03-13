@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 
 FILE_INPUT_JS = r"""
 function collectElementsDeep(node, out) {
@@ -45,6 +46,15 @@ for (const el of fileInputs) {
   }
 }
 return fileInputs[0];
+"""
+
+ATTACHMENT_STATE_JS = r"""
+const fileInputs = [...document.querySelectorAll('input[type="file"]')];
+const hasFiles = fileInputs.some((el) => el.files && el.files.length > 0);
+const hasPreview = !!document.querySelector(
+  'img[src^="blob:"], img[src^="data:image/"], [data-testid*="attachment"], [class*="attachment"], [aria-label*="image"], [aria-label*="attachment"]'
+);
+return { hasFiles, hasPreview, ok: hasFiles || hasPreview };
 """
 
 
@@ -160,7 +170,17 @@ $img.Dispose()
         return False
 
 
-def _paste_with_shortcut_windows(press_enter: bool) -> bool:
+def _paste_with_shortcut_windows(press_enter: bool, chat_input=None) -> bool:
+    # Prefer Selenium key events first so we stay in the exact chat element.
+    if chat_input is not None:
+        try:
+            chat_input.send_keys(Keys.chord(Keys.CONTROL, "v"))
+            if press_enter:
+                chat_input.send_keys(Keys.ENTER)
+            return True
+        except Exception:
+            pass
+
     keys = "^v"
     if press_enter:
         keys += "{ENTER}"
@@ -184,6 +204,18 @@ Start-Sleep -Milliseconds 120
         return False
 
 
+def _read_attachment_state(driver) -> dict:
+    try:
+        state = driver.execute_script(ATTACHMENT_STATE_JS) or {}
+    except Exception:
+        return {"ok": False, "hasFiles": False, "hasPreview": False}
+    return {
+        "ok": bool(state.get("ok")),
+        "hasFiles": bool(state.get("hasFiles")),
+        "hasPreview": bool(state.get("hasPreview")),
+    }
+
+
 def _paste_image_from_clipboard(driver, image_path: Path, chat_input, press_enter: bool) -> tuple[bool, str]:
     try:
         driver.execute_script("arguments[0].focus(); arguments[0].click();", chat_input)
@@ -202,9 +234,12 @@ def _paste_image_from_clipboard(driver, image_path: Path, chat_input, press_ente
     if system == "windows":
         if not _copy_image_to_clipboard_windows(image_path):
             return False, "copy_clipboard_fail"
-        if not _paste_with_shortcut_windows(press_enter):
+        if not _paste_with_shortcut_windows(press_enter, chat_input=chat_input):
             return False, "paste_shortcut_fail"
-        time.sleep(0.35)
+        time.sleep(0.45)
+        state = _read_attachment_state(driver)
+        if not state.get("ok"):
+            return False, "paste_no_attachment_detected"
         return True, "clipboard_windows"
 
     return False, f"unsupported_os:{system}"
@@ -263,6 +298,18 @@ def send_image_to_chat(
     resolved = Path(image_path).expanduser().resolve()
     if not resolved.exists() or not resolved.is_file():
         return False, {"error": "image_not_found", "image_path": str(resolved)}
+
+    system = platform.system().lower()
+
+    # On Windows, file-input upload is more reliable than clipboard paste.
+    if system == "windows":
+        ok, method = _attach_via_file_input(driver, resolved)
+        if frame_path is not None:
+            _switch_to_frame_path(driver, frame_path)
+        else:
+            driver.switch_to.default_content()
+        if ok:
+            return True, {"method": method, "image_path": str(resolved)}
 
     if chat_input is not None and frame_path is not None:
         if _switch_to_frame_path(driver, frame_path):
