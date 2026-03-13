@@ -334,7 +334,8 @@ def download_matching_chromedriver(browser_version: str) -> Path | None:
     major = browser_version.split(".", 1)[0]
     platform_label = get_platform_label()
     cache_dir = Path.home() / ".cache" / "codex_chromedriver" / major / platform_label
-    cached = cache_dir / "chromedriver"
+    driver_binary_name = "chromedriver.exe" if platform_label == "win64" else "chromedriver"
+    cached = cache_dir / driver_binary_name
     if cached.exists():
         return cached
 
@@ -375,16 +376,29 @@ def download_matching_chromedriver(browser_version: str) -> Path | None:
     try:
         import zipfile
 
+        extracted_binary: Path | None = None
         with zipfile.ZipFile(zip_path) as zf:
             for member in zf.namelist():
-                if member.endswith("/chromedriver") or member.endswith("\\chromedriver"):
-                    zf.extract(member, cache_dir)
-                    src = cache_dir / member
-                    src.rename(cached)
-                    break
-            else:
-                print("Khong thay binary chromedriver trong file zip.")
-                return None
+                normalized = member.replace("\\", "/")
+                basename = normalized.rsplit("/", 1)[-1].lower()
+                if basename not in {"chromedriver", "chromedriver.exe"}:
+                    continue
+
+                zf.extract(member, cache_dir)
+                src = cache_dir / normalized
+                if not src.exists():
+                    continue
+
+                cached.parent.mkdir(parents=True, exist_ok=True)
+                if cached.exists():
+                    cached.unlink()
+                src.rename(cached)
+                extracted_binary = cached
+                break
+
+        if extracted_binary is None:
+            print("Khong thay binary chromedriver trong file zip.")
+            return None
     except Exception as exc:
         print(f"Giai nen chromedriver that bai: {exc}")
         return None
@@ -392,7 +406,8 @@ def download_matching_chromedriver(browser_version: str) -> Path | None:
         if zip_path.exists():
             zip_path.unlink()
 
-    cached.chmod(0o755)
+    if platform_label != "win64":
+        cached.chmod(0o755)
     print(f"Da tai chromedriver {major} ve: {cached}")
     return cached
 
