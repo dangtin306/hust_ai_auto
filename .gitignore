@@ -1,2 +1,4 @@
 image_vscode/
 deep_scan_debug.txt
+__pycache__/
+*.pyc
