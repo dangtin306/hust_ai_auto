@@ -1,3 +1,0 @@
-Nhận được rồi, Codex vẫn hoạt động bình thường và mình thấy 2 ảnh giống nhau đã được gửi lên.
-
-Muốn mình test tiếp phần nào: đọc ảnh, OCR chữ trong ảnh, hay xử lý ảnh bằng Python?
