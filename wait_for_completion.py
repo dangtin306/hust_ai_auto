@@ -9,7 +9,7 @@ from pathlib import Path
 from selenium.webdriver.common.by import By
 
 from get_result import find_message_frame_path, latest_assistant_message, read_message_units
-from main_service import attach_driver
+from send_and_get_result import attach_driver
 
 
 THINKING_STATE_JS = r"""

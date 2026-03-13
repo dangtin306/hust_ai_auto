@@ -8,7 +8,7 @@ from pathlib import Path
 
 from selenium.webdriver.common.by import By
 
-from main_service import attach_driver
+from send_and_get_result import attach_driver
 
 
 MESSAGE_FRAME_JS = r"""
