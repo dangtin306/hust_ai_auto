@@ -22,6 +22,8 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
+from start_service import launch_chrome_debugger
+
 DEEP_SCAN_JS = r"""
 const selectors = arguments[0];
 
@@ -316,14 +318,6 @@ def is_debug_port_ready_with_retry(
     return False
 
 
-def chrome_binary_candidates() -> list[str]:
-    return [
-        "/Applications/Visual Studio Code.app/Contents/MacOS/Electron",
-        "/Applications/Visual Studio Code - Insiders.app/Contents/MacOS/Electron",
-        "/Applications/VSCodium.app/Contents/MacOS/Electron",
-    ]
-
-
 def get_platform_label() -> str:
     system = platform.system().lower()
     machine = platform.machine().lower()
@@ -401,37 +395,6 @@ def download_matching_chromedriver(browser_version: str) -> Path | None:
     cached.chmod(0o755)
     print(f"Da tai chromedriver {major} ve: {cached}")
     return cached
-
-
-def launch_chrome_debugger(debugger_address: str, startup_wait: float) -> bool:
-    host, port = parse_host_port(debugger_address)
-    if host != "127.0.0.1" and host.lower() != "localhost":
-        print("Chi ho tro tu mo debug target voi host localhost/127.0.0.1.")
-        return False
-
-    chrome_binary = next((p for p in chrome_binary_candidates() if p and Path(p).exists()), None)
-    if not chrome_binary:
-        print("Khong tim thay binary VS Code de tu mo remote debugging.")
-        return False
-
-    user_data_dir = Path.home() / ".selenium-debug-profile"
-    cmd = [
-        chrome_binary,
-        f"--remote-debugging-port={port}",
-        f"--user-data-dir={user_data_dir}",
-        "--no-first-run",
-        "--no-default-browser-check",
-        "about:blank",
-    ]
-    subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    print(f"Da yeu cau mo VS Code debug tren cong {port}, doi {startup_wait:.1f}s...")
-    time.sleep(startup_wait)
-    return is_debug_port_ready_with_retry(
-        debugger_address=debugger_address,
-        timeout=1.2,
-        retries=6,
-        retry_delay=1.0,
-    )
 
 
 def attach_driver(debugger_address: str) -> webdriver.Chrome:
