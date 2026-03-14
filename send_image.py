@@ -49,12 +49,70 @@ return fileInputs[0];
 """
 
 ATTACHMENT_STATE_JS = r"""
-const fileInputs = [...document.querySelectorAll('input[type="file"]')];
+const targetName = String(arguments[0] || "").toLowerCase();
+
+function collectElementsDeep(node, out) {
+  if (!node) return;
+  if (node.nodeType === Node.ELEMENT_NODE) {
+    out.push(node);
+    if (node.shadowRoot) collectElementsDeep(node.shadowRoot, out);
+  }
+  const children = node.children || [];
+  for (let i = 0; i < children.length; i += 1) {
+    collectElementsDeep(children[i], out);
+  }
+}
+
+function isVisible(el) {
+  if (!el || !el.getBoundingClientRect) return false;
+  const style = window.getComputedStyle(el);
+  if (!style) return false;
+  if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity || "1") === 0) {
+    return false;
+  }
+  const rect = el.getBoundingClientRect();
+  return !!rect && rect.width > 0 && rect.height > 0;
+}
+
+function textOf(el) {
+  return String(el.innerText || el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+const all = [];
+collectElementsDeep(document.documentElement || document, all);
+
+const fileInputs = all.filter((el) => {
+  if (!el || !el.tagName) return false;
+  if (el.tagName.toLowerCase() !== "input") return false;
+  return String(el.getAttribute("type") || "").toLowerCase() === "file";
+});
 const hasFiles = fileInputs.some((el) => el.files && el.files.length > 0);
-const hasPreview = !!document.querySelector(
-  'img[src^="blob:"], img[src^="data:image/"], [data-testid*="attachment"], [class*="attachment"], [aria-label*="image"], [aria-label*="attachment"]'
-);
-return { hasFiles, hasPreview, ok: hasFiles || hasPreview };
+
+const previewSelector =
+  'img[src^="blob:"], img[src^="data:image/"], [data-testid*="attachment"], [data-testid*="upload"], [class*="attachment"], [class*="upload"], [aria-label*="image"], [aria-label*="attachment"]';
+let hasPreview = false;
+let fileLikeTextCount = 0;
+let fileNameHit = false;
+
+for (const el of all) {
+  if (!isVisible(el)) continue;
+  const txt = textOf(el);
+  if (targetName && txt.includes(targetName)) fileNameHit = true;
+  if (/\b[\w .-]+\.(png|jpe?g|webp|gif|bmp|tiff?)\b/i.test(txt)) fileLikeTextCount += 1;
+  if (!hasPreview && el.matches) {
+    try {
+      if (el.matches(previewSelector)) hasPreview = true;
+    } catch (_) {}
+  }
+}
+
+return {
+  hasFiles,
+  hasPreview,
+  fileNameHit,
+  fileLikeTextCount,
+  ok: hasFiles || hasPreview || fileNameHit || fileLikeTextCount > 0,
+};
 """
 
 
@@ -204,16 +262,37 @@ Start-Sleep -Milliseconds 120
         return False
 
 
-def _read_attachment_state(driver) -> dict:
-    try:
-        state = driver.execute_script(ATTACHMENT_STATE_JS) or {}
-    except Exception:
-        return {"ok": False, "hasFiles": False, "hasPreview": False}
+def _normalize_attachment_state(state: dict | None = None) -> dict:
+    raw = state or {}
     return {
-        "ok": bool(state.get("ok")),
-        "hasFiles": bool(state.get("hasFiles")),
-        "hasPreview": bool(state.get("hasPreview")),
+        "ok": bool(raw.get("ok")),
+        "hasFiles": bool(raw.get("hasFiles")),
+        "hasPreview": bool(raw.get("hasPreview")),
+        "fileNameHit": bool(raw.get("fileNameHit")),
+        "fileLikeTextCount": int(raw.get("fileLikeTextCount") or 0),
     }
+
+
+def _read_attachment_state(driver, image_name: str = "") -> dict:
+    try:
+        state = driver.execute_script(ATTACHMENT_STATE_JS, image_name or "") or {}
+    except Exception:
+        return _normalize_attachment_state()
+    return _normalize_attachment_state(state)
+
+
+def _attachment_state_changed(before: dict, after: dict) -> bool:
+    if bool(after.get("hasFiles")) and not bool(before.get("hasFiles")):
+        return True
+    if bool(after.get("hasPreview")) and not bool(before.get("hasPreview")):
+        return True
+    if bool(after.get("fileNameHit")) and not bool(before.get("fileNameHit")):
+        return True
+    before_count = int(before.get("fileLikeTextCount") or 0)
+    after_count = int(after.get("fileLikeTextCount") or 0)
+    if after_count > before_count:
+        return True
+    return False
 
 
 def _paste_image_from_clipboard(driver, image_path: Path, chat_input, press_enter: bool) -> tuple[bool, str]:
@@ -232,15 +311,19 @@ def _paste_image_from_clipboard(driver, image_path: Path, chat_input, press_ente
         return True, "clipboard_mac"
 
     if system == "windows":
+        before = _read_attachment_state(driver, image_name=image_path.name)
         if not _copy_image_to_clipboard_windows(image_path):
             return False, "copy_clipboard_fail"
         if not _paste_with_shortcut_windows(press_enter, chat_input=chat_input):
             return False, "paste_shortcut_fail"
-        time.sleep(0.45)
-        state = _read_attachment_state(driver)
-        if not state.get("ok"):
-            return False, "paste_no_attachment_detected"
-        return True, "clipboard_windows"
+        for _ in range(5):
+            time.sleep(0.2)
+            state = _read_attachment_state(driver, image_name=image_path.name)
+            if _attachment_state_changed(before, state):
+                return True, "clipboard_windows_detected"
+            if state.get("ok") and before.get("ok") and (state.get("fileNameHit") or before.get("fileNameHit")):
+                return True, "clipboard_windows_existing_attachment"
+        return False, "paste_no_attachment_detected"
 
     return False, f"unsupported_os:{system}"
 
@@ -275,15 +358,23 @@ def _attach_via_file_input(driver, image_path: Path) -> tuple[bool, str]:
         pass
 
     try:
+        before = _read_attachment_state(driver, image_name=image_path.name)
         file_input.send_keys(str(image_path))
         files_count = driver.execute_script(
             "const el = arguments[0]; return el.files ? el.files.length : 0;",
             file_input,
         )
-        if int(files_count or 0) <= 0:
-            return False, "file_input_no_files_after_send"
-        time.sleep(0.35)
-        return True, "file_input_send_keys"
+        if int(files_count or 0) > 0:
+            time.sleep(0.25)
+            return True, "file_input_send_keys_files_present"
+        for _ in range(6):
+            time.sleep(0.2)
+            state = _read_attachment_state(driver, image_name=image_path.name)
+            if _attachment_state_changed(before, state):
+                return True, "file_input_send_keys_state_changed"
+            if state.get("ok") and before.get("ok") and (state.get("fileNameHit") or before.get("fileNameHit")):
+                return True, "file_input_existing_attachment"
+        return False, "file_input_no_attachment_detected"
     except Exception:
         return False, "file_input_send_keys_fail"
 
@@ -301,17 +392,24 @@ def send_image_to_chat(
 
     system = platform.system().lower()
 
-    # On Windows, file-input upload is more reliable than clipboard paste.
-    if system == "windows":
-        ok, method = _attach_via_file_input(driver, resolved)
-        if frame_path is not None:
-            _switch_to_frame_path(driver, frame_path)
-        else:
-            driver.switch_to.default_content()
-        if ok:
-            return True, {"method": method, "image_path": str(resolved)}
+    attempt_errors: list[str] = []
+    clipboard_tried = False
 
-    if chat_input is not None and frame_path is not None:
+    # On Windows, clipboard paste is usually more stable for VS Code Codex chat.
+    if system == "windows" and chat_input is not None and frame_path is not None:
+        if _switch_to_frame_path(driver, frame_path):
+            clipboard_tried = True
+            ok, method = _paste_image_from_clipboard(
+                driver=driver,
+                image_path=resolved,
+                chat_input=chat_input,
+                press_enter=press_enter,
+            )
+            if ok:
+                return True, {"method": method, "image_path": str(resolved)}
+            attempt_errors.append(f"clipboard:{method}")
+
+    if chat_input is not None and frame_path is not None and not clipboard_tried:
         if _switch_to_frame_path(driver, frame_path):
             ok, method = _paste_image_from_clipboard(
                 driver=driver,
@@ -321,6 +419,7 @@ def send_image_to_chat(
             )
             if ok:
                 return True, {"method": method, "image_path": str(resolved)}
+            attempt_errors.append(f"clipboard:{method}")
 
     ok, method = _attach_via_file_input(driver, resolved)
     if frame_path is not None:
@@ -329,4 +428,5 @@ def send_image_to_chat(
         driver.switch_to.default_content()
     if ok:
         return True, {"method": method, "image_path": str(resolved)}
-    return False, {"error": method, "image_path": str(resolved)}
+    attempt_errors.append(f"file_input:{method}")
+    return False, {"error": method, "attempts": attempt_errors, "image_path": str(resolved)}
