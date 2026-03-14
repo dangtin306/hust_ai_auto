@@ -25,6 +25,8 @@ from selenium.webdriver.common.keys import Keys
 from send_image import send_image_to_chat
 from start_service import dismiss_vscode_update_notification, has_vscode_update_notification, launch_chrome_debugger
 
+IMAGE_TEXT_DELAY_SECONDS = 1.5
+
 DEEP_SCAN_JS = r"""
 const selectors = arguments[0];
 
@@ -769,6 +771,7 @@ def send_message(
                 append_debug_log(log_path, "send_image_deep_scan", {"ok": image_ok, "meta": image_meta})
                 if not image_ok:
                     raise RuntimeError(f"khong gui duoc image: {image_meta}")
+                time.sleep(IMAGE_TEXT_DELAY_SECONDS)
             if message:
                 chat_input.send_keys(message)
                 typed_ok = driver.execute_script(
@@ -821,6 +824,7 @@ def send_message(
             append_debug_log(log_path, "send_image_active_element", {"ok": image_ok, "meta": image_meta})
             if not image_ok:
                 raise RuntimeError(f"khong gui duoc image: {image_meta}")
+            time.sleep(IMAGE_TEXT_DELAY_SECONDS)
 
         if message:
             active.send_keys(message)
