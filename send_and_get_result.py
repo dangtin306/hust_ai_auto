@@ -60,6 +60,20 @@ function scoreElement(el) {
   const ariaLabel = (el.getAttribute("aria-label") || "").toLowerCase();
   const placeholder = (el.getAttribute("placeholder") || "").toLowerCase();
   const contextText = [className, ariaLabel, placeholder].join(" ");
+  const parentHint = (el.closest("[aria-label], [class], [id]") || el);
+  const parentText = [
+    (parentHint.getAttribute("aria-label") || "").toLowerCase(),
+    (parentHint.getAttribute("class") || "").toLowerCase(),
+    (parentHint.getAttribute("id") || "").toLowerCase(),
+  ].join(" ");
+  const allHints = [contextText, parentText].join(" ");
+  const hasChatHint =
+    allHints.includes("chat") ||
+    allHints.includes("codex") ||
+    allHints.includes("copilot") ||
+    allHints.includes("prompt") ||
+    allHints.includes("ask codex") ||
+    allHints.includes("ask");
   if (
     contextText.includes("terminal") ||
     contextText.includes("xterm") ||
@@ -69,6 +83,17 @@ function scoreElement(el) {
   }
   if (el.closest(".terminal, .xterm, .xterm-screen, .xterm-helpers")) return -9999;
   if (el.closest(".monaco-editor")) return -9999;
+  if (
+    !hasChatHint &&
+    (
+      allHints.includes("filter problems") ||
+      allHints.includes("problems") ||
+      allHints.includes("debug console") ||
+      allHints.includes("markers-panel")
+    )
+  ) {
+    return -9999;
+  }
 
   let score = -1000;
   for (const sel of selectors) {
@@ -88,12 +113,6 @@ function scoreElement(el) {
   if (aria.includes("chat") || aria.includes("prompt") || aria.includes("copilot") || aria.includes("codex")) score += 35;
   if (placeholder.includes("chat") || placeholder.includes("prompt") || placeholder.includes("ask")) score += 35;
   if (role === "textbox") score += 10;
-  const parentHint = (el.closest("[aria-label], [class], [id]") || el);
-  const parentText = [
-    (parentHint.getAttribute("aria-label") || "").toLowerCase(),
-    (parentHint.getAttribute("class") || "").toLowerCase(),
-    (parentHint.getAttribute("id") || "").toLowerCase(),
-  ].join(" ");
   if (
     parentText.includes("chat") ||
     parentText.includes("codex") ||
@@ -154,6 +173,9 @@ DEEP_CHAT_SELECTORS = [
     "input:not([type])",
     "div[contenteditable='true']",
     "div[role='textbox']",
+    "input[placeholder*='ask' i]",
+    "input[aria-label*='chat' i]",
+    "input[aria-label*='codex' i]",
 ]
 
 MESSAGE_FRAME_JS = r"""
