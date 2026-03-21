@@ -15,6 +15,7 @@ is_debug_port_ready_with_retry = _impl.is_debug_port_ready_with_retry
 launch_chrome_debugger = _impl.launch_chrome_debugger
 send_message = _impl.send_message
 build_parser = _impl.build_parser
+run_send_and_get = _impl.run_send_and_get
 main = _impl.main
 
 

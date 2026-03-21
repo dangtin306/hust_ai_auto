@@ -27,6 +27,19 @@ from start_service import dismiss_vscode_update_notification, has_vscode_update_
 
 IMAGE_TEXT_DELAY_SECONDS = 1.5
 
+DEFAULT_DEBUGGER_ADDRESS = "127.0.0.1:9222"
+DEFAULT_MESSAGE = "Viet cho toi 1 ham Java check root Android don gian"
+DEFAULT_FALLBACK_WAIT = 5.0
+DEFAULT_KEEP_OPEN = 2.0
+DEFAULT_STARTUP_WAIT = 2.0
+DEFAULT_TIMEOUT = 60.0
+DEFAULT_POLL_INTERVAL = 1.0
+DEFAULT_STABLE_FOR = 2.0
+DEFAULT_POST_DELAY = 1.0
+DEFAULT_DEBUG_LOG_PATH = str(Path(__file__).with_name("deep_scan_debug.txt"))
+DEFAULT_OUTPUT_PATH = str(Path(__file__).with_name("latest_codex_reply.txt"))
+DEFAULT_JSON_OUTPUT_PATH = str(Path(__file__).with_name("latest_codex_reply.json"))
+
 DEEP_SCAN_JS = r"""
 const selectors = arguments[0];
 
@@ -882,12 +895,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--debugger-address",
-        default="127.0.0.1:9222",
+        default=DEFAULT_DEBUGGER_ADDRESS,
         help="Dia chi DevTools target da bat remote debugging.",
     )
     parser.add_argument(
         "--message",
-        default="Viet cho toi 1 ham Java check root Android don gian",
+        default=DEFAULT_MESSAGE,
         help="Noi dung prompt can gui.",
     )
     parser.add_argument(
@@ -898,13 +911,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--fallback-wait",
         type=float,
-        default=5.0,
+        default=DEFAULT_FALLBACK_WAIT,
         help="So giay cho ban click tay vao o chat neu auto tim that bai.",
     )
     parser.add_argument(
         "--keep-open",
         type=float,
-        default=2.0,
+        default=DEFAULT_KEEP_OPEN,
         help="So giay giu script truoc khi ket thuc.",
     )
     parser.add_argument(
@@ -915,7 +928,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--startup-wait",
         type=float,
-        default=2.0,
+        default=DEFAULT_STARTUP_WAIT,
         help="So giay cho app debug khoi dong truoc khi attach.",
     )
     parser.add_argument(
@@ -925,7 +938,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--debug-log",
-        default=str(Path(__file__).with_name("deep_scan_debug.txt")),
+        default=DEFAULT_DEBUG_LOG_PATH,
         help="File txt luu log debug moi lan chay.",
     )
     parser.add_argument(
@@ -936,35 +949,35 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--timeout",
         type=float,
-        default=60.0,
+        default=DEFAULT_TIMEOUT,
         help="So giay toi da de doi cau tra loi moi.",
     )
     parser.add_argument(
         "--poll-interval",
         type=float,
-        default=1.0,
+        default=DEFAULT_POLL_INTERVAL,
         help="Chu ky poll cau tra loi.",
     )
     parser.add_argument(
         "--stable-for",
         type=float,
-        default=2.0,
+        default=DEFAULT_STABLE_FOR,
         help="Fallback neu khong bat duoc Thinking: doi reply on dinh bao lau.",
     )
     parser.add_argument(
         "--post-delay",
         type=float,
-        default=1.0,
+        default=DEFAULT_POST_DELAY,
         help="Delay them bao lau sau khi Thinking ket thuc truoc khi doc reply.",
     )
     parser.add_argument(
         "--output",
-        default=str(Path(__file__).with_name("latest_codex_reply.txt")),
+        default=DEFAULT_OUTPUT_PATH,
         help="File txt de luu cau tra loi moi nhat.",
     )
     parser.add_argument(
         "--json-output",
-        default=str(Path(__file__).with_name("latest_codex_reply.json")),
+        default=DEFAULT_JSON_OUTPUT_PATH,
         help="File json de luu metadata va lich su message vua doc duoc.",
     )
     parser.add_argument(
@@ -975,48 +988,77 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> int:
-    args = build_parser().parse_args()
-    log_path = Path(args.debug_log).expanduser().resolve()
-    output_path = Path(args.output).expanduser().resolve()
-    json_output_path = Path(args.json_output).expanduser().resolve()
+def run_send_and_get(
+    *,
+    debugger_address: str = DEFAULT_DEBUGGER_ADDRESS,
+    message: str = DEFAULT_MESSAGE,
+    image: str = "",
+    fallback_wait: float = DEFAULT_FALLBACK_WAIT,
+    keep_open: float = DEFAULT_KEEP_OPEN,
+    auto_launch_chrome: bool = False,
+    startup_wait: float = DEFAULT_STARTUP_WAIT,
+    no_enter: bool = False,
+    debug_log: str = DEFAULT_DEBUG_LOG_PATH,
+    no_wait_reply: bool = False,
+    timeout: float = DEFAULT_TIMEOUT,
+    poll_interval: float = DEFAULT_POLL_INTERVAL,
+    stable_for: float = DEFAULT_STABLE_FOR,
+    post_delay: float = DEFAULT_POST_DELAY,
+    output: str = DEFAULT_OUTPUT_PATH,
+    json_output: str = DEFAULT_JSON_OUTPUT_PATH,
+    print_all: bool = False,
+) -> dict:
+    normalized_message = message or ""
+    log_path = Path(debug_log).expanduser().resolve()
+    output_path = Path(output).expanduser().resolve()
+    json_output_path = Path(json_output).expanduser().resolve()
+
+    result: dict = {
+        "ok": False,
+        "code": 1,
+        "debugger_address": debugger_address,
+        "output_path": str(output_path),
+        "json_output_path": str(json_output_path),
+        "debug_log_path": str(log_path),
+    }
+
     image_path: Path | None = None
-    if args.image:
-        image_path = Path(args.image).expanduser().resolve()
+    if image:
+        image_path = Path(image).expanduser().resolve()
         if not image_path.exists() or not image_path.is_file():
             print(f"Khong tim thay file image: {image_path}")
-            return 1
+            result["error"] = "image_not_found"
+            result["image_path"] = str(image_path)
+            return result
 
     append_debug_log(
         log_path,
         "run_start",
         {
-            "debugger_address": args.debugger_address,
-            "fallback_wait": args.fallback_wait,
-            "keep_open": args.keep_open,
-            "auto_launch": args.auto_launch_chrome,
-            "startup_wait": args.startup_wait,
-            "no_enter": args.no_enter,
-            "no_wait_reply": args.no_wait_reply,
-            "message_len": len(args.message),
+            "debugger_address": debugger_address,
+            "fallback_wait": fallback_wait,
+            "keep_open": keep_open,
+            "auto_launch": auto_launch_chrome,
+            "startup_wait": startup_wait,
+            "no_enter": no_enter,
+            "no_wait_reply": no_wait_reply,
+            "message_len": len(normalized_message),
             "has_image": image_path is not None,
             "image_path": str(image_path) if image_path else "",
-            "timeout": args.timeout,
+            "timeout": timeout,
         },
     )
 
     debug_target_ready = is_debug_port_ready_with_retry(
-        debugger_address=args.debugger_address,
+        debugger_address=debugger_address,
         timeout=0.8,
         retries=4,
         retry_delay=1.0,
     )
     if not debug_target_ready:
-        print(f"Chua thay debug target tai {args.debugger_address}.")
-        if args.auto_launch_chrome:
-            debug_target_ready = launch_chrome_debugger(
-                args.debugger_address, args.startup_wait
-            )
+        print(f"Chua thay debug target tai {debugger_address}.")
+        if auto_launch_chrome:
+            debug_target_ready = launch_chrome_debugger(debugger_address, startup_wait)
             if not debug_target_ready:
                 print("Tu mo VS Code that bai hoac port van chua san sang.")
         else:
@@ -1027,14 +1069,24 @@ def main() -> int:
         append_debug_log(
             log_path,
             "run_abort_no_debug_target",
-            {"debugger_address": args.debugger_address},
+            {"debugger_address": debugger_address},
         )
-        return 1
+        result["error"] = "debug_target_not_ready"
+        return result
 
-    print(f"Dang attach debugger tai {args.debugger_address} ...")
-    driver = attach_driver(args.debugger_address)
+    print(f"Dang attach debugger tai {debugger_address} ...")
+    try:
+        driver = attach_driver(debugger_address)
+    except SystemExit as exc:
+        message_text = str(exc) or "attach_driver_failed"
+        print(message_text)
+        append_debug_log(log_path, "attach_driver_failed", {"error": message_text})
+        result["error"] = "attach_driver_failed"
+        result["detail"] = message_text
+        return result
+
     reply_frame_path: list[int] | None = None
-    previous_signature = ('', '')
+    previous_signature = ("", "")
 
     try:
         time.sleep(3.0)
@@ -1065,7 +1117,7 @@ def main() -> int:
         else:
             print("Khong thay thong bao VS Code can dong.")
 
-        if not args.no_wait_reply and not args.no_enter:
+        if not no_wait_reply and not no_enter:
             reply_frame_path = find_message_frame_path(driver)
             if reply_frame_path is not None:
                 before_messages = read_message_units(driver, reply_frame_path)
@@ -1076,30 +1128,37 @@ def main() -> int:
                 append_debug_log(
                     log_path,
                     "reply_frame_not_found_before_send",
-                    {"debugger_address": args.debugger_address},
+                    {"debugger_address": debugger_address},
                 )
         ok = send_message(
             driver=driver,
-            message=args.message,
-            fallback_wait=args.fallback_wait,
+            message=normalized_message,
+            fallback_wait=fallback_wait,
             log_path=log_path,
-            press_enter=not args.no_enter,
+            press_enter=not no_enter,
             image_path=image_path,
         )
         if not ok:
             append_debug_log(log_path, "run_done", {"ok": False})
             print("Khong gui duoc prompt.")
-            return 1
+            result["error"] = "send_message_failed"
+            return result
 
-        if args.no_enter:
+        if no_enter:
             append_debug_log(log_path, "run_done", {"ok": True, "no_enter": True})
             print("Da nhap prompt, bo qua doi reply vi --no-enter.")
-            return 0
+            result["ok"] = True
+            result["code"] = 0
+            result["no_enter"] = True
+            return result
 
-        if args.no_wait_reply:
+        if no_wait_reply:
             append_debug_log(log_path, "run_done", {"ok": True, "wait_reply": False})
             print("Da gui prompt. Bo qua doi reply vi --no-wait-reply.")
-            return 0
+            result["ok"] = True
+            result["code"] = 0
+            result["wait_reply"] = False
+            return result
 
         if reply_frame_path is None:
             reply_frame_path = find_message_frame_path(driver)
@@ -1110,16 +1169,17 @@ def main() -> int:
                 {"ok": False, "reason": "reply_frame_not_found"},
             )
             print("Da gui prompt nhung khong tim thay frame chat de doi reply.")
-            return 1
+            result["error"] = "reply_frame_not_found"
+            return result
 
         latest, messages, meta = wait_for_reply_completion(
             driver=driver,
             frame_path=reply_frame_path,
             previous_signature=previous_signature,
-            timeout=args.timeout,
-            poll_interval=args.poll_interval,
-            stable_for=args.stable_for,
-            post_delay=args.post_delay,
+            timeout=timeout,
+            poll_interval=poll_interval,
+            stable_for=stable_for,
+            post_delay=post_delay,
         )
         if not latest or assistant_signature(latest) == previous_signature:
             append_debug_log(
@@ -1128,7 +1188,9 @@ def main() -> int:
                 {"ok": False, "reason": "no_new_reply", "meta": meta},
             )
             print("Khong thay cau tra loi moi trong thoi gian cho.")
-            return 1
+            result["error"] = "no_new_reply"
+            result["meta"] = meta
+            return result
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
         json_output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1136,8 +1198,8 @@ def main() -> int:
         json_output_path.write_text(
             json.dumps(
                 {
-                    "debugger_address": args.debugger_address,
-                    "prompt": args.message,
+                    "debugger_address": debugger_address,
+                    "prompt": normalized_message,
                     "image_path": str(image_path) if image_path else "",
                     "frame_path": reply_frame_path,
                     "latest": latest,
@@ -1154,7 +1216,7 @@ def main() -> int:
         print(latest["text"])
         print(f"\nDa luu txt: {output_path}")
         print(f"Da luu json: {json_output_path}")
-        if args.print_all:
+        if print_all:
             print("\nTat ca message units:")
             for index, item in enumerate(messages, start=1):
                 print(f"[{index}] {item['role']} {item['key']}")
@@ -1170,12 +1232,43 @@ def main() -> int:
                 "seen_thinking": meta.get("seen_thinking"),
             },
         )
-        return 0
+        result["ok"] = True
+        result["code"] = 0
+        result["latest"] = latest
+        result["latest_text"] = latest.get("text", "")
+        result["messages"] = messages
+        result["meta"] = meta
+        result["frame_path"] = reply_frame_path
+        return result
     finally:
-        if args.keep_open > 0:
-            time.sleep(args.keep_open)
+        if keep_open > 0:
+            time.sleep(keep_open)
             print("Ket thuc script, dong trinh duyet debug.")
         driver.quit()
+
+
+def main() -> int:
+    args = build_parser().parse_args()
+    result = run_send_and_get(
+        debugger_address=args.debugger_address,
+        message=args.message,
+        image=args.image,
+        fallback_wait=args.fallback_wait,
+        keep_open=args.keep_open,
+        auto_launch_chrome=args.auto_launch_chrome,
+        startup_wait=args.startup_wait,
+        no_enter=args.no_enter,
+        debug_log=args.debug_log,
+        no_wait_reply=args.no_wait_reply,
+        timeout=args.timeout,
+        poll_interval=args.poll_interval,
+        stable_for=args.stable_for,
+        post_delay=args.post_delay,
+        output=args.output,
+        json_output=args.json_output,
+        print_all=args.print_all,
+    )
+    return int(result.get("code", 1))
 
 
 if __name__ == "__main__":
