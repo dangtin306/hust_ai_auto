@@ -14,7 +14,7 @@ python flask_api.py
 
 Mac dinh:
 - Host: 127.0.0.1
-- Port: 5000
+- Port: 8795
 - Flask debug reloader: BAT (tu restart khi doi code)
 
 Neu can doi host/port:
@@ -59,7 +59,7 @@ Luu y:
 
 import requests
 
-base = "http://127.0.0.1:5000"
+base = "http://127.0.0.1:8795"
 payload = {
     "message": "viet cho toi 1 ham python doc file json",
     "auto_launch_chrome": True

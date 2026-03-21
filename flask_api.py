@@ -189,5 +189,5 @@ def api_latest() -> Any:
 
 if __name__ == "__main__":
     host = os.environ.get("HUST_API_HOST", "127.0.0.1")
-    port = int(os.environ.get("HUST_API_PORT", "5000"))
+    port = int(os.environ.get("HUST_API_PORT", "8795"))
     app.run(host=host, port=port, debug=True, use_reloader=True, threaded=True)
