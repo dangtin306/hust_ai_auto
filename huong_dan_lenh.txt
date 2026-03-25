@@ -1,69 +1,45 @@
-HUONG DAN CHAY FLASK API - HUST AI AUTO
-=======================================
+HUONG DAN CHAY LENH CU (CLI) - HUST AI AUTO
+============================================
 
 Muc tieu:
-- Khong go CLI cho tung tac vu Selenium nua.
-- Goi qua HTTP API.
-- Tu dong reset/reload moi lan sua code Python.
+- Khong dung HTTP API Flask.
+- Goi truc tiep bang lenh python nhu truoc.
 
 
-1) Khoi dong API server
------------------------
+1) Gui prompt va doi tra loi (mac dinh)
+---------------------------------------
 
-python flask_api.py
+python main_service.py --auto-launch-chrome --message "viet cho toi 1 ham python doc file json"
 
-Mac dinh:
-- Host: 127.0.0.1
-- Port: 8795
-- Flask debug reloader: BAT (tu restart khi doi code)
-
-Neu can doi host/port:
-- HUST_API_HOST
-- HUST_API_PORT
+Ket qua mac dinh:
+- latest_codex_reply.txt
+- latest_codex_reply.json
 
 
-2) Endpoint chinh
------------------
+2) Gui kem image
+---------------
 
-- GET /health
-- POST /api/v1/send-and-get
-- POST /api/v1/send
-- GET /api/v1/latest
+python main_service.py --auto-launch-chrome --image "image.png" --message "phan tich noi dung trong anh"
 
 
-3) JSON payload cho /api/v1/send-and-get
-----------------------------------------
+3) Chi gui prompt, khong doi reply
+----------------------------------
 
-{
-  "message": "test codex nhe",
-  "image": "",
-  "debugger_address": "127.0.0.1:9222",
-  "auto_launch_chrome": false,
-  "fallback_wait": 5.0,
-  "timeout": 60.0,
-  "poll_interval": 1.0,
-  "stable_for": 2.0,
-  "post_delay": 1.0,
-  "debug_log": "deep_scan_debug.txt",
-  "output": "latest_codex_reply.txt",
-  "json_output": "latest_codex_reply.json"
-}
-
-Luu y:
-- /api/v1/send: chi gui prompt, khong doi tra loi (tuong duong no_wait_reply=true).
-- /api/v1/latest: doc ket qua txt/json moi nhat da luu.
+python main_service.py --auto-launch-chrome --message "test nhanh" --no-wait-reply
 
 
-4) Vi du goi API bang Python requests
--------------------------------------
+4) Tuy chinh file output
+------------------------
 
-import requests
+python main_service.py --auto-launch-chrome --message "test output" --output "run_code\\reply.txt" --json-output "run_code\\reply.json"
 
-base = "http://127.0.0.1:8795"
-payload = {
-    "message": "viet cho toi 1 ham python doc file json",
-    "auto_launch_chrome": True
-}
-resp = requests.post(f"{base}/api/v1/send-and-get", json=payload, timeout=180)
-print(resp.status_code)
-print(resp.json())
+
+5) Tham so hay dung
+-------------------
+
+- --debugger-address 127.0.0.1:9222
+- --timeout 60
+- --poll-interval 1.0
+- --stable-for 2.0
+- --post-delay 1.0
+- --debug-log deep_scan_debug.txt
